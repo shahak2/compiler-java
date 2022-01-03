@@ -1,0 +1,9 @@
+void main() {
+
+    int p;
+    p = 10;
+    while(0 < p){
+        p = p - 1;
+    }    
+
+}

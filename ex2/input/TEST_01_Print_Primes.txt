@@ -1,0 +1,25 @@
+int IsPrime(int p)
+{
+    int i := 2;
+    int j := 2;
+    i := i+1;
+
+}
+
+void PrintPrimes(int start, int end)
+{
+    int p := 2;
+
+    while (p < end+1)
+    {
+        if (IsPrime(p))
+        {
+            PrintInt(p);
+        }
+    }
+}
+
+void main()
+{
+    PrintPrimes(2,100);
+}
