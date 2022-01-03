@@ -1,0 +1,309 @@
+/*************/
+/* IMPORT(S) */
+/*************/
+import java.io.PrintWriter;
+import java_cup.runtime.*;
+import AST.*;
+import java.lang.Math;
+
+parser code 
+{:
+	public Lexer lexer;
+	public PrintWriter w;
+
+	public Parser(Lexer lexer, PrintWriter w) 
+	{
+		super(lexer);
+		this.lexer = lexer;
+		this.w = w;
+	}
+	public void report_error(String message, Object info)
+	{
+		PrintWriter x = this.w;
+		String error_msg = String.format("ERROR(%d)", lexer.getLine());
+		x.print(error_msg);
+		System.out.print("ERROR >> ");		
+		System.out.print("[");
+		System.out.print(lexer.getLine());
+		System.out.print(":");
+		System.out.print(lexer.getCharPos());
+		System.out.print("] ");		
+		x.close();
+		System.exit(0);
+	}
+
+
+:}
+
+/************************/
+/* CUSTOMIZE CUP PARSER */
+/************************/
+scan with
+{:
+	Symbol s;
+	s = lexer.next_token();
+	//System.out.print(s.sym);
+	System.out.print("[");
+	System.out.print(lexer.getLine());
+	System.out.print(":");
+	System.out.print(lexer.getCharPos());
+	System.out.print("] ");
+	System.out.print(TokenNames.terminalNames[s.sym]);
+	if (TokenNames.terminalNames[s.sym]=="ERROR")
+	{
+	    this.w.print("ERROR");
+	    this.w.close();
+	    System.exit(0);
+	}
+	if (s.value != null)
+	{
+		if(TokenNames.terminalNames[s.sym]=="INT")
+		{
+			if((int)s.value >= (int)Math.pow(2, 15))
+			{
+			    this.w.print("ERROR");
+			    this.w.close();
+			    System.exit(0);
+			}
+
+		}
+		System.out.print("( ");
+		System.out.print(s.value);
+		System.out.print(" )");
+	}
+	System.out.print("\n");
+	return s; 
+:};
+
+
+
+
+/*************/
+/* TERMINALS */
+/*************/
+terminal IF;
+terminal EQ;
+terminal LT;
+terminal GT;
+terminal NIL;
+terminal DOT;
+terminal NEW;
+terminal PLUS;
+terminal COMMA;
+terminal MINUS;
+terminal CLASS;
+terminal ARRAY;
+terminal TIMES;
+terminal WHILE;
+terminal DIVIDE;
+terminal UMINUS;  
+terminal LPAREN;
+terminal RPAREN;
+terminal LBRACK;
+terminal RBRACK;
+terminal LBRACE;
+terminal RBRACE;
+terminal ASSIGN;
+terminal RETURN;
+terminal EXTENDS;
+terminal SEMICOLON;
+terminal ERROR;
+
+/*************/
+/* TERMINALS */
+/*************/
+terminal String STRING;
+terminal TYPE_STRING;
+terminal Integer INT;
+terminal TYPE_VOID;
+terminal String ID;
+terminal TYPE_INT;
+
+
+
+/*****************/
+/* NON TERMINALS */
+/*****************/
+
+non terminal AST_PROGRAM Program;
+
+non terminal AST_exp exp;
+non terminal AST_VAR var;
+non terminal AST_STMT stmt;
+non terminal AST_STMT_LIST stmtList;
+non terminal AST_EXP_LIST expList;
+
+/******** NOTICE CHANGES *********/ 
+
+non terminal AST_typeID_LIST typeIDList;
+
+
+non terminal AST_typeID typeID;
+
+non terminal AST_dec dec;
+non terminal AST_type type;
+non terminal AST_arrayTypedef arrayTypedef;
+non terminal AST_varDec varDec;
+non terminal AST_funcDec funcDec;
+non terminal AST_classDec classDec;
+
+non terminal AST_varDec cFieldvarDec;
+non terminal AST_exp cFieldexp;
+non terminal AST_newExp newExp;
+non terminal AST_cField cField;
+non terminal AST_cFieldList cFieldList;
+
+
+
+/***********************/
+/* OPERATOR PRECEDENCE */
+/***********************/
+					               
+precedence nonassoc ASSIGN; 
+precedence left EQ;
+precedence left LT;
+precedence left GT;
+precedence left PLUS;
+precedence left MINUS;
+precedence left TIMES;
+precedence left DIVIDE;
+precedence left UMINUS; 
+precedence nonassoc LBRACK;  
+precedence nonassoc LPAREN;  
+precedence left DOT;
+
+
+/************************/
+/* START WITH: program */
+/************************/
+
+start with Program;
+
+/********************/
+/* DERIVATION RULES */
+/********************/
+
+
+stmtList	::=		stmt:s	stmtList:l					{: RESULT = new AST_STMT_LIST(s, sleft+1, sright+1, l);    :}
+					| stmt:s							{: RESULT = new AST_STMT_LIST(s, sleft+1, sright+1, null); :}
+					;
+
+
+Program		::=		dec:decName	Program:p				{: RESULT = new AST_PROGRAM(decName, p); :}
+					| dec:decName						{: RESULT = new AST_PROGRAM(decName, null); :}
+					;
+
+
+dec 		::=	    varDec:vd							{: RESULT = new AST_dec_varDec(vd); :}
+					| funcDec:fd 						{: RESULT = new AST_dec_funcDec(fd); :}
+					| classDec:cd						{: RESULT = new AST_dec_classDec(cd); :}
+					| arrayTypedef:atd          		{: RESULT = new AST_dec_arrayTypedef(atd); :}
+					;
+					
+					
+type 		::= 	TYPE_INT							{: RESULT = new AST_type_TYPE_INT(); :}
+					| TYPE_STRING 			  			{: RESULT = new AST_type_TYPE_STRING(); :}
+					| TYPE_VOID			       			{: RESULT = new AST_type_TYPE_VOID(); :}
+					| ID:name                   		{: RESULT = new AST_type_ID(name, nameleft, nameright); :}
+				    ;
+				
+				
+arrayTypedef ::=	ARRAY ID:name EQ type:t LBRACK RBRACK SEMICOLON     {: RESULT = new AST_arrayTypedef(name, nameleft+1, nameright+1, t, tleft+1, tright+1); :}
+				    ;
+
+
+varDec		::=		type:t ID:name SEMICOLON    				{: RESULT = new AST_varDec_SIMPLE(t, tleft+1, tright+1, name, nameleft+1, nameright+1); :}
+					| type:t ID:name ASSIGN exp:e SEMICOLON     {: RESULT = new AST_varDec_exp(t, tleft,tright, name, nameleft+1, nameright+1, e, eleft+1, eright+1); :}
+					| type:t ID:name ASSIGN newExp:ne SEMICOLON {: RESULT = new AST_varDec_newExp(t, tleft+1, tright+1, name, nameleft+1, nameright+1, ne, neleft+1, neright+1); :}
+					;
+
+
+typeIDList     ::=   typeID:tID COMMA typeIDList:l   {: RESULT = new AST_typeID_LIST(tID, tIDleft+1, tIDright+1, l);    :}
+                    | typeID:tID				{: RESULT = new AST_typeID_LIST(tID, tIDleft+1, tIDright+1, null); :}
+					;
+					
+typeID         ::=  type:t ID:name       {: RESULT = new AST_typeID(t, tleft+1, tright+1, name, nameleft+1, nameright+1); :} ;
+
+
+cField      ::=     cFieldvarDec:vd                   {: RESULT = new AST_cField_VAR_DEC(vd, vdleft+1, vdright+1); :}
+                    | funcDec:fd                   {: RESULT = new AST_cField_FUNC_DEC(fd, fdleft+1, fdright+1); :}
+                    ;
+
+cFieldvarDec ::=    type:t ID:name SEMICOLON    				{: RESULT = new AST_cField_varDec_exp(t, tleft+1, tright+1, name, nameleft+1, nameright+1, null, -1, -1); :}
+                    | type:t ID:name ASSIGN cFieldexp:e SEMICOLON     {: RESULT = new AST_cField_varDec_exp(t, tleft+1, tright+1, name, nameleft+1, nameright+1, e, eleft+1, eright+1); :}
+                    ;
+
+
+cFieldexp   ::=     INT:i											{: RESULT = new AST_EXP_INT(i, ileft, iright);           :}
+                    | MINUS INT:i 									{: RESULT = new AST_EXP_INT(0 - i.intValue(), ileft, iright); :}
+                    | NIL 											{: RESULT = new AST_EXP_NIL(); :}
+                    | STRING: s 									{: RESULT = new AST_EXP_STRING(s, sleft, sright); :}
+                    ;
+
+
+						
+cFieldList     ::=  cField:cf cFieldList:l   {: RESULT = new AST_cFieldList(cf, cfleft+1, cfright+1, l);    :}
+                    | cField:cf				{: RESULT = new AST_cFieldList(cf, cfleft+1, cfright+1, null); :}
+					;
+
+
+funcDec		::=	 	type:t ID:name LPAREN RPAREN LBRACE stmtList:sl RBRACE	{: RESULT = new AST_funcDec_SIMPLE(t, tleft+1, tright+1, name, nameleft+1, nameright+1, sl); :}
+					| type:t1 ID:name1 LPAREN typeIDList:tidl RPAREN LBRACE stmtList:sl RBRACE
+					  {: RESULT = new AST_funcDec_NESTED(t1, t1left+1, t1right+1, name1, name1left+1, name1right+1, tidl, sl); :}
+
+					;
+					
+					
+classDec    ::=     CLASS ID:name LBRACE cFieldList:cfl RBRACE {: RESULT = new AST_classDec_SIMPLE(name, nameleft+1, nameright+1, cfl); :}
+                    | CLASS ID:name1 EXTENDS ID:name2 LBRACE cFieldList:cfl RBRACE 
+                      {: RESULT = new AST_classDec_EXTENDS(name1, name1left+1, name1right+1, name2, name2left+1, name2right+1, cfl); :}
+                    ;
+
+
+var			::=		ID:name								{: RESULT = new AST_VAR_SIMPLE(name, nameleft+1, nameright+1);       :}
+					| var:v DOT ID:fieldName			{: RESULT = new AST_VAR_FIELD(v, vleft+1, vright+1, fieldName, fieldNameleft+1, fieldNameright+1); :}
+					| var:v LBRACK exp:e RBRACK			{: RESULT = new AST_VAR_SUBSCRIPT(v, vleft+1, vright+1, e, eleft+1, eright+1);     :}
+					;
+
+	
+exp			::=		INT:i											{: RESULT = new AST_EXP_INT(i, ileft, iright);           :}
+					| MINUS INT:i 									{: RESULT = new AST_EXP_INT(0 - i.intValue(), ileft, iright); :} 
+					| var:v											{: RESULT = new AST_EXP_VAR(v, vleft+1, vright+1);           :}
+					| exp:e1 PLUS  exp:e2							{: RESULT = new AST_EXP_BINOP(e1, e1left+1, e1right+1, e2, e2left+1, e2right+1, 0); :}
+					| exp:e1 MINUS exp:e2							{: RESULT = new AST_EXP_BINOP(e1, e1left+1, e1right+1, e2, e2left+1, e2right+1, 1); :}
+					| exp:e1 TIMES exp:e2							{: RESULT = new AST_EXP_BINOP(e1, e1left+1, e1right+1, e2, e2left+1, e2right+1, 2); :}
+					| exp:e1 DIVIDE exp:e2							{: RESULT = new AST_EXP_BINOP(e1, e1left+1, e1right+1, e2, e2left+1, e2right+1, 3); :}
+					| exp:e1 LT exp:e2								{: RESULT = new AST_EXP_BINOP(e1, e1left+1, e1right+1, e2, e2left+1, e2right+1, 4); :}
+					| exp:e1 GT exp:e2								{: RESULT = new AST_EXP_BINOP(e1, e1left+1, e1right+1, e2, e2left+1, e2right+1, 5); :}
+					| exp:e1 EQ exp:e2								{: RESULT = new AST_EXP_BINOP(e1, e1left+1, e1right+1, e2, e2left+1, e2right+1, 6); :}
+					| LPAREN exp:e1 RPAREN							{: RESULT = new AST_EXP_PAREN(e1, e1left+1, e1right+1);:} 			
+					| NIL 											{: RESULT = new AST_EXP_NIL(); :}  			
+					| STRING: s 									{: RESULT = new AST_EXP_STRING(s, sleft+1, sright+1); :}
+					| ID: name LPAREN RPAREN 						{: RESULT = new AST_EXP_ID_EXP_LIST(name, nameleft+1, nameright+1, null);:} 
+					| ID: name LPAREN expList:e1 RPAREN 			{: RESULT = new AST_EXP_ID_EXP_LIST(name, nameleft+1, nameright+1, e1);:}
+					| var:v DOT ID: name LPAREN RPAREN				{: RESULT = new AST_EXP_VAR_FIELD_EXP_LIST(v, vleft+1, vright+1, name, nameleft+1, nameright+1, null);:} 
+					| var:v DOT ID: name LPAREN expList:e1 RPAREN	{: RESULT = new AST_EXP_VAR_FIELD_EXP_LIST(v, vleft+1, vright+1, name, nameleft+1, nameright+1, e1);:} 
+					;
+
+newExp      ::=     NEW type:t                                  {: RESULT = new AST_newExp_EXP(t, tleft+1, tright+1, null, -1, -1); :}
+                    | NEW type:t  LBRACK exp:e RBRACK           {: RESULT = new AST_newExp_EXP(t, tleft+1, tright+1, e, eleft+1, eright+1); :}
+                    ;
+
+
+expList     ::=		exp:e COMMA	expList:el		{: RESULT = new AST_EXP_LIST(e, eleft+1, eright+1, el);    :}
+					| exp:e				        {: RESULT = new AST_EXP_LIST(e, eleft+1, eright+1, null); :}
+					;  
+							
+								
+stmt		::=		var:v ASSIGN exp:e SEMICOLON								{: RESULT = new AST_STMT_ASSIGN(v, vleft+1, vright+1, e, eleft+1, eright+1); :}
+					| IF LPAREN exp:cond RPAREN LBRACE stmtList:body RBRACE		{: RESULT = new AST_STMT_IF(cond, condleft+1, condright+1, body); :}
+					| WHILE LPAREN exp:cond RPAREN LBRACE stmtList:body RBRACE	{: RESULT = new AST_STMT_WHILE(cond, condleft+1, condright+1, body); :}
+					| varDec: vd 												{: RESULT = new AST_STMT_varDec(vd); :}
+					| var:v ASSIGN newExp:ne SEMICOLON							{: RESULT = new AST_STMT_newExp(v, vleft+1, vright+1, ne, neleft+1, neright+1); :}
+					| RETURN SEMICOLON											{: RESULT = new AST_STMT_RETURN_EXP(null, -1, -1); :}	
+					| RETURN exp:e SEMICOLON									{: RESULT = new AST_STMT_RETURN_EXP(e, eleft+1, eright+1); :}
+					| ID: name LPAREN RPAREN SEMICOLON							{: RESULT = new AST_STMT_EXP_LIST(name, nameleft+1, nameright+1, null);:} 
+					| ID: name LPAREN expList:e1 RPAREN SEMICOLON 				{: RESULT = new AST_STMT_EXP_LIST(name, nameleft+1, nameright+1, e1);:}
+					| var:v DOT ID: name LPAREN RPAREN SEMICOLON				{: RESULT = new AST_STMT_VAR_FIELD_EXP_LIST(v, vleft+1, vright+1, name, nameleft+1, nameright+1, null);:} 
+					| var:v DOT ID: name LPAREN expList:e1 RPAREN SEMICOLON		{: RESULT = new AST_STMT_VAR_FIELD_EXP_LIST(v, vleft+1, vright+1, name, nameleft+1, nameright+1, e1);:} 
+					;
